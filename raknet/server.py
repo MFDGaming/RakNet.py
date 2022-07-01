@@ -37,7 +37,9 @@ class Server(Sc):
                 self.connected_handler(connection)
         else:
             if frame.body[0] == 0x00:
-                self.online_server_handlers.handle_connected_ping(frame, connection)
+                connection.handle_connected_ping(frame)
+            elif frame.body[0] == 0x03:
+                pass # just do nothing about it
             elif frame.body[0] == 0x15:
                 self.remove_connection(connection.address)
             else:
@@ -45,32 +47,36 @@ class Server(Sc):
 
     def handle_task(self) -> None:
         while self.is_running:
-            recv: tuple = self.dgram.receive()
-            try:
-                if recv:
-                    address: InternetAddress = InternetAddress(
-                        recv[1][0],
-                        recv[1][1],
-                        self.address.version
-                    )
-                    if recv[0][0] == 0x01 or recv[0][0] == 0x02:
-                        self.offline_handlers.handle_unconnected_ping(recv[0], address)
-                    elif recv[0][0] == 0x05:
-                        self.offline_handlers.handle_open_connection_request_one(recv[0], address)
-                    elif recv[0][0] == 0x07:
-                        self.offline_handlers.handle_open_connection_request_two(recv[0], address)
-                    else:
-                        connection: Connection = self.get_connection(address)
-                        if connection is not None:
-                            connection.handle(recv[0])
-            except Exception as e:
-                print(e)
+            start: float = time()
+            for i in range(5000):
+                recv: tuple = self.dgram.receive()
+                try:
+                    if recv:
+                        address: InternetAddress = InternetAddress(
+                            recv[1][0],
+                            recv[1][1],
+                            self.address.version
+                        )
+                        if recv[0][0] == 0x01 or recv[0][0] == 0x02:
+                            self.offline_handlers.handle_unconnected_ping(recv[0], address)
+                        elif recv[0][0] == 0x05:
+                            self.offline_handlers.handle_open_connection_request_one(recv[0], address)
+                        elif recv[0][0] == 0x07:
+                            self.offline_handlers.handle_open_connection_request_two(recv[0], address)
+                        else:
+                            connection: Connection = self.get_connection(address)
+                            if connection is not None:
+                                connection.handle(recv[0])
+                except Exception as e:
+                    print(e)
+            diff: float = time() - start
+            if diff < 0.05:
+                sleep(0.05 - diff)
             for connection in list(self.connections.values()):
                 if (time() - connection.last_update_time) >= 10:
                     self.remove_connection(connection.address)
                 else:
                     connection.tick()
-            sleep(0.05)
 
     def add_connection(
         self,

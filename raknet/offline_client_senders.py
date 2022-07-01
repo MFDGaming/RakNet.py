@@ -17,6 +17,7 @@ class OfflineClientSenders:
     def send_unconnected_ping(self) -> None:
         unconnected_ping: UnconnectedPing = UnconnectedPing()
         unconnected_ping.client_timestamp = self.sc.timestamp
+        unconnected_ping.has_client_guid = self.sc.unconnected_ping_has_client_guid
         unconnected_ping.client_guid = self.sc.guid
         self.sc.dgram.send(unconnected_ping.serialize(self.sc.has_open_connections), (self.sc.connection.address.name, self.sc.connection.address.port))
 

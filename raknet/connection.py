@@ -9,6 +9,8 @@ from raknet.misc.frame import Frame
 from raknet.misc.internet_address import InternetAddress
 from raknet.misc.reliability import Reliability
 from raknet.packet.ack import Ack
+from raknet.packet.connected_ping import ConnectedPing
+from raknet.packet.connected_pong import ConnectedPong
 from raknet.packet.frame_set import FrameSet
 from raknet.packet.nack import Nack
 from raknet.sc import Sc
@@ -182,7 +184,28 @@ class Connection:
         elif 0x80 <= data[0] <= 0x8f:
             self.handle_frame_set(data)
 
+    def send_connected_ping(self) -> None:
+        connected_ping: ConnectedPing = ConnectedPing()
+        connected_ping.ping_timestamp = self.sc.timestamp
+        frame_to_send: Frame = Frame()
+        frame_to_send.body = connected_ping.serialize()
+        self.append_frame(frame_to_send, True)
+
+    def handle_connected_ping(self, frame: Frame) -> None:
+        connected_ping: ConnectedPing = ConnectedPing()
+        connected_ping.deserialize(frame.body)
+        connected_pong: ConnectedPong = ConnectedPong()
+        connected_pong.ping_timestamp = connected_ping.ping_timestamp
+        connected_pong.has_pong_timestamp = self.sc.connected_pong_has_pong_timestamp
+        if self.sc.connected_pong_has_pong_timestamp:
+            connected_pong.pong_timestamp = self.sc.timestamp
+        frame_to_send: Frame = Frame()
+        frame_to_send.body = connected_pong.serialize()
+        self.append_frame(frame_to_send, True)
+
     def tick(self) -> None:
         self.send_ack_queue()
         self.send_nack_queue()
         self.send_queue()
+        if self.has_connected:
+            self.send_connected_ping()

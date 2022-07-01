@@ -7,8 +7,6 @@
 from raknet.misc.frame import Frame
 from raknet.misc.internet_address import InternetAddress
 from raknet.packet.new_incoming_connection import NewIncomingConnection
-from raknet.packet.connected_ping import ConnectedPing
-from raknet.packet.connected_pong import ConnectedPong
 from raknet.packet.connection_request_accepted import ConnectionRequestAccepted
 from raknet.sc import Sc
 
@@ -29,13 +27,3 @@ class OnlineClientHandlers:
         frame_to_send.body = new_incoming_connection.serialize()
         self.sc.connection.append_frame(frame_to_send, True)
         self.sc.connection.has_connected = True
-
-    def handle_connected_ping(self, frame: Frame) -> None:
-        connected_ping: ConnectedPing = ConnectedPing()
-        connected_ping.deserialize(frame.body)
-        connected_pong: ConnectedPong = ConnectedPong()
-        connected_pong.ping_timestamp = connected_ping.ping_timestamp
-        connected_pong.pong_timestamp = self.sc.timestamp
-        frame_to_send: Frame = Frame()
-        frame_to_send.body = connected_pong.serialize()
-        self.sc.connection.append_frame(frame_to_send, True)

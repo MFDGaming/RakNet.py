@@ -5,7 +5,6 @@
 """
 
 from raknet.misc.frame import Frame
-from raknet.packet.connected_ping import ConnectedPing
 from raknet.packet.connection_request import ConnectionRequest
 from raknet.sc import Sc
 
@@ -20,11 +19,4 @@ class OnlineClientSenders:
         connection_request.client_timestamp = self.sc.timestamp
         frame_to_send: Frame = Frame()
         frame_to_send.body = connection_request.serialize()
-        self.sc.connection.append_frame(frame_to_send, True)
-
-    def send_connected_ping(self) -> None:
-        connected_ping: ConnectedPing = ConnectedPing()
-        connected_ping.ping_timestamp = self.sc.timestamp
-        frame_to_send: Frame = Frame()
-        frame_to_send.body = connected_ping.serialize()
         self.sc.connection.append_frame(frame_to_send, True)
