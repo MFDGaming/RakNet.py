@@ -39,7 +39,7 @@ class Server(Sc):
             if frame.body[0] == 0x00:
                 connection.handle_connected_ping(frame)
             elif frame.body[0] == 0x03:
-                pass # just do nothing about it
+                connection.handle_connected_pong(frame)
             elif frame.body[0] == 0x15:
                 self.remove_connection(connection.address)
             else:

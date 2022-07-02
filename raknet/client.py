@@ -64,7 +64,7 @@ class Client(Sc):
             if frame.body[0] == 0x15:
                 self.disconnect()
             elif frame.body[0] == 0x03:
-                pass # just do nothing about it
+                self.connection.handle_connected_pong(frame)
             elif frame.body[0] == 0x00:
                 self.connection.handle_connected_ping(frame)
             else:

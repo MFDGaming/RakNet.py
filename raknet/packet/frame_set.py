@@ -11,6 +11,7 @@ class FrameSet:
     def __init__(self):
         self.sequence_number: int = 0
         self.frames: list = []
+        self.send_time: float = 0.0
 
     def deserialize(self, data: bytes) -> None:
         self.sequence_number = int.from_bytes(

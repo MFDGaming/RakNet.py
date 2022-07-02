@@ -36,6 +36,8 @@ class Connection:
         self.queue: list = []
         self.frame_holder: dict = {}
         self.recovery_queue: dict = {}
+        self.wait_for_pong: bool = False
+        self.ms: int = 0
 
     def send_ack_queue(self) -> None:
         if self.ack_queue:
@@ -51,25 +53,30 @@ class Connection:
             self.sc.dgram.send(ack.serialize(), (self.address.name, self.address.port))
             self.ack_queue = []
 
+    def send_frames(self, frames: list) -> None:
+        frame_set: FrameSet = FrameSet()
+        frame_set.sequence_number = self.sender_sequence_number
+        frame_set.frames = frames
+        self.sender_sequence_number += 1
+        frame_set.send_time = time()
+        self.recovery_queue[frame_set.sequence_number] = frame_set
+        self.sc.dgram.send(frame_set.serialize(), (self.address.name, self.address.port))
+
     def send_queue(self) -> None:
         if self.queue:
-            frame_set: FrameSet = FrameSet()
-            frame_set.sequence_number = self.sender_sequence_number
-            frame_set.frames = self.queue
-            self.sender_sequence_number += 1
-            self.recovery_queue[frame_set.sequence_number] = frame_set
-            self.sc.dgram.send(frame_set.serialize(), (self.address.name, self.address.port))
+            self.send_frames(self.queue)
             self.queue = []
 
     def append_frame(self, frame: Frame, is_immediate: bool) -> None:
-        size = 4 + frame.size
-        for entry in self.queue:
-            size += entry.size
-        if size > (self.mtu_size - 36):
-            self.send_queue()
-        self.queue.append(frame)
         if is_immediate:
-            self.send_queue()
+            self.send_frames([frame])
+        else:
+            size = 4 + frame.size
+            for entry in self.queue:
+                size += entry.size
+            if size > (self.mtu_size - 36):
+                self.send_queue()
+            self.queue.append(frame)
 
     def add_to_queue(self, frame: Frame) -> None:
         if frame.is_sequenced:
@@ -129,12 +136,8 @@ class Connection:
         nack.deserialize(data)
         for sequence_number in nack.sequence_numbers:
             if sequence_number in self.recovery_queue:
-                frame_set: FrameSet = self.recovery_queue[sequence_number]
-                frame_set.sequence_number = self.sender_sequence_number
-                self.sender_sequence_number += 1
-                self.recovery_queue[frame_set.sequence_number] = frame_set
+                self.send_frames(self.recovery_queue[sequence_number].frames)
                 del self.recovery_queue[sequence_number]
-                self.sc.dgram.send(frame_set.serialize(), (self.address.name, self.address.port))
                 break
 
     def handle_fragmented_frame(self, frame: Frame) -> None:
@@ -185,6 +188,7 @@ class Connection:
             self.handle_frame_set(data)
 
     def send_connected_ping(self) -> None:
+        self.wait_for_pong = True
         connected_ping: ConnectedPing = ConnectedPing()
         connected_ping.ping_timestamp = self.sc.timestamp
         frame_to_send: Frame = Frame()
@@ -196,16 +200,25 @@ class Connection:
         connected_ping.deserialize(frame.body)
         connected_pong: ConnectedPong = ConnectedPong()
         connected_pong.ping_timestamp = connected_ping.ping_timestamp
-        connected_pong.has_pong_timestamp = self.sc.connected_pong_has_pong_timestamp
-        if self.sc.connected_pong_has_pong_timestamp:
-            connected_pong.pong_timestamp = self.sc.timestamp
+        connected_pong.pong_timestamp = self.sc.timestamp
         frame_to_send: Frame = Frame()
         frame_to_send.body = connected_pong.serialize()
         self.append_frame(frame_to_send, True)
+
+    def handle_connected_pong(self, frame: Frame) -> None:
+        connected_pong: ConnectedPong = ConnectedPong()
+        connected_pong.deserialize(frame.body)
+        self.ms = self.sc.timestamp - connected_pong.ping_timestamp
+        self.wait_for_pong = False
 
     def tick(self) -> None:
         self.send_ack_queue()
         self.send_nack_queue()
         self.send_queue()
+        for frame_set in list(self.recovery_queue.values()):
+            if frame_set.send_time < (time() - 8):
+                self.send_frames(frame_set.frames)
+                del self.recovery_queue[frame_set.sequence_number]
         if self.has_connected:
-            self.send_connected_ping()
+            if not self.wait_for_pong:
+                self.send_connected_ping()
