@@ -31,7 +31,6 @@ class Sc:
         self.connected_handler: Callable = lambda connection: None
         self.frame_handler: Callable = lambda frame, connection: None
         self.disconnected_handler = lambda connection: None
-        self.connected_pong_has_pong_timestamp: bool = True
 
     @property
     def timestamp(self) -> int:
