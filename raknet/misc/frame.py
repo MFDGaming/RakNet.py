@@ -125,23 +125,26 @@ class Frame:
             pack(">H", len(self.body) << 3) +
             (
                 int.to_bytes(
-                    self.reliable_index,
+                    self.reliable_index & 0xffffff,
                     3,
                     "little"
                 ) if self.is_reliable else b""
             ) +
             (
                 int.to_bytes(
-                    self.sequenced_index,
+                    self.sequenced_index & 0xffffff,
                     3,
                     "little"
                 ) if self.is_sequenced else b""
             ) +
             (
-                int.to_bytes(
-                    self.ordered_index,
-                    3,
-                    "little"
+                (
+                    int.to_bytes(
+                        self.ordered_index & 0xffffff,
+                        3,
+                        "little"
+                    ) +
+                    pack("B", self.order_channel)
                 ) if self.is_ordered else b""
       	    ) +
             (

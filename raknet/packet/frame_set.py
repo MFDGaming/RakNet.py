@@ -27,7 +27,7 @@ class FrameSet:
         return (
             b"\x80" +
             int.to_bytes(
-                self.sequence_number,
+                self.sequence_number & 0xffffff,
                 3,
                 "little"
             ) +
